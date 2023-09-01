@@ -1,0 +1,27 @@
+GO
+/****** Object:  Table [dbo].[machineFileInfo]    Script Date: 01-09-2023 12:08:18 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[machineFileInfo]') AND type in (N'U'))
+BEGIN
+CREATE TABLE [dbo].[machineFileInfo](
+	[standardfileName] [nvarchar](100) NULL,
+	[provenfileName] [nvarchar](100) NULL,
+	[fileType] [nvarchar](100) NULL,
+	[filePath] [nvarchar](1000) NULL,
+	[fileSize] [nvarchar](100) NULL,
+	[fileDateCreated] [datetime] NULL,
+	[StandardModifiedDate] [datetime] NULL,
+	[provenModifiedDate] [datetime] NULL,
+	[fileOwner] [nvarchar](100) NULL,
+	[computer] [nvarchar](100) NULL,
+	[isMoved] [nvarchar](100) NULL,
+	[operationno] [int] NULL,
+	[operationDespcription] [nvarchar](100) NULL,
+	[componentid] [nvarchar](100) NULL,
+	[UpdatedTS] [datetime] NULL
+) ON [PRIMARY]
+END
+GO

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
-using System.Data;
 using System.Data.SqlClient;
 using System.IO;
 using System.Reflection;
@@ -15,8 +14,8 @@ namespace machineFilesInfo
         private readonly string appPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
         private readonly List<FileInformation> ProvenMachineProgramList = new List<FileInformation>();
         private readonly List<FileInformation> StandardSoftwareProgramList = new List<FileInformation>();
-        private readonly List<TimeSpan> shiftDetails = new List<TimeSpan>();
-        private List<FileInformation> dblist = new List<FileInformation>();
+        private List<TimeSpan> shiftDetails = new List<TimeSpan>();
+        private readonly List<FileInformation> dblist = new List<FileInformation>();
         private readonly string synctype = ConfigurationManager.AppSettings["syncType"];
         private readonly Thread StartFunctionThread = null;
         private DateTime Target = DateTime.Now.AddHours(-1);
@@ -49,17 +48,7 @@ namespace machineFilesInfo
             {
                 if (synctype.Equals("shiftend", StringComparison.OrdinalIgnoreCase))
                 {
-                    string query = "select * from shiftdetails where running = 1";
-                    SqlConnection conn = ConnectionManager.GetConnection();
-                    SqlCommand cmd = new SqlCommand(query, conn);
-                    SqlDataReader reader = cmd.ExecuteReader();
-
-                    while (reader.Read())
-                    {
-                        //get time only from db
-                        TimeSpan Shiftend = DateTime.Parse(reader["ToTime"].ToString()).TimeOfDay;
-                        shiftDetails.Add(Shiftend);
-                    }
+                    shiftDetails = fileDataBaseAccess.GetShiftDetails();
                     shiftDetails.Sort();
                 }
                 else
@@ -91,7 +80,7 @@ namespace machineFilesInfo
             }
         }
 
-        private void GetLocalFiles(string path)
+        private void GetProvenFiles(string path)
         {
             try
             {
@@ -112,6 +101,16 @@ namespace machineFilesInfo
                         ProvenMachineProgramList.Add(localFile);
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Logger.WriteErrorLog(ex.Message);
+            }
+        }
+        private void GetStandardFiles(string path)
+        {
+            try
+            {
                 foreach (string subDirectory in Directory.GetDirectories(path, "Standard Software Program", SearchOption.AllDirectories))
                 {
                     foreach (string file in Directory.GetFiles(subDirectory))
@@ -142,7 +141,7 @@ namespace machineFilesInfo
             try
             {
                 string LocalDirectory = ConfigurationManager.AppSettings["folderPath"].ToString();
-                GetLocalFiles(LocalDirectory);
+                GetStandardFiles(LocalDirectory);
                 conn = ConnectionManager.GetConnection();
                 foreach (FileInformation sfile in StandardSoftwareProgramList)
                 {
@@ -150,6 +149,7 @@ namespace machineFilesInfo
                 }
                 conn?.Close();
                 conn = ConnectionManager.GetConnection();
+                GetProvenFiles(LocalDirectory);
                 foreach (FileInformation pfile in ProvenMachineProgramList)
                 {
                     string folder = pfile.FolderPath.Substring(0, pfile.FolderPath.LastIndexOf('\\'));
@@ -158,7 +158,7 @@ namespace machineFilesInfo
                     fileDataBaseAccess.InsertOrUpdateProvenIntoDatabase(pfile, conn);
                     if (sfile == null)
                     {
-                        fileDataBaseAccess.UpdateStatusStandardToNUll(pfile, conn);
+                        fileDataBaseAccess.UpdateStatusStandardToNULL(pfile, conn);
                     }
                 }
 
@@ -173,7 +173,8 @@ namespace machineFilesInfo
                 {
                     idx = 0;
                 }
-                Target = DateTime.Now.Add(shiftDetails[idx]);
+                //make target time as shift end time of today 
+                Target = DateTime.Today.Add(shiftDetails[idx]);
             }
             catch (Exception ex)
             {
@@ -191,8 +192,11 @@ namespace machineFilesInfo
         protected override void OnStop()
         {
             running = false;
-            StartFunctionThread.Abort();
-            Thread.CurrentThread.Name = "Main";
+            StartFunctionThread.Join();
+            if (string.IsNullOrEmpty(Thread.CurrentThread.Name))
+            {
+                Thread.CurrentThread.Name = "Main";
+            }
             Logger.WriteDebugLog($"Service Stop at: {DateTime.Now}");
         }
 

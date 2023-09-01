@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
 
@@ -6,10 +7,37 @@ namespace machineFilesInfo
 {
     internal static class fileDataBaseAccess
     {
+        public static List<TimeSpan> GetShiftDetails()
+        {
+            try
+            {
+
+                List<TimeSpan> shiftDetails = new List<TimeSpan>();
+                string query = "select * from shiftdetails where running = 1";
+                SqlConnection conn = ConnectionManager.GetConnection();
+                SqlCommand cmd = new SqlCommand(query, conn);
+                SqlDataReader reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    //get time only from db
+                    TimeSpan Shiftend = DateTime.Parse(reader["ToTime"].ToString()).TimeOfDay;
+                    shiftDetails.Add(Shiftend);
+                }
+                return shiftDetails;
+
+            }
+            catch (Exception ex)
+            {
+                Logger.WriteErrorLog(ex.Message);
+                return new List<TimeSpan>();
+            }
+        }
         public static void InsertOrUpdateStandardIntoDatabase(FileInformation SFile, SqlConnection conn)
         {
             try
             {
+                string UpdatedTS = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 string standardfileName = SFile.FileName;
                 string fileType = SFile.FileType;
                 string filePath = SFile.FolderPath;
@@ -34,7 +62,7 @@ namespace machineFilesInfo
                                         ELSE
                                             BEGIN
                                                 INSERT INTO machineFileInfo (standardfileName, fileType, filePath, fileSize, fileDateCreated, StandardModifiedDate, fileOwner, computer, isMoved, operationno, operationDespcription, componentid, UpdatedTS)
-                                                VALUES (@standardfileName, @fileType, @filePath, @fileSize, @fileDateCreated, @StandardModifiedDate, @fileOwner, @computer, @isMoved, @operationno, @operationDespcription, @componentid, GETDATE());
+                                                VALUES (@standardfileName, @fileType, @filePath, @fileSize, @fileDateCreated, @StandardModifiedDate, @fileOwner, @computer, @isMoved, @operationno, @operationDespcription, @componentid, @UpdatedTS);
                                             END";
 
 
@@ -52,6 +80,7 @@ namespace machineFilesInfo
                     _ = cmd.Parameters.AddWithValue("@operationno", operationno);
                     _ = cmd.Parameters.AddWithValue("@operationDespcription", operationDespcription);
                     _ = cmd.Parameters.AddWithValue("@componentid", componentid);
+                    _ = cmd.Parameters.AddWithValue("@UpdatedTS", UpdatedTS);
                     _ = cmd.ExecuteNonQuery();
                     Logger.WriteExtraLog($"File {SFile.FileName} information inserted or updated in the database." + DateTime.Now);
                 }
@@ -65,6 +94,7 @@ namespace machineFilesInfo
 
         public static void InsertOrUpdateProvenIntoDatabase(FileInformation PFile, SqlConnection conn)
         {
+            string UpdatedTS = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             string provenfileName = PFile.FileName;
             string fileType = PFile.FileType;
             string filePath = PFile.FolderPath;
@@ -90,7 +120,7 @@ namespace machineFilesInfo
                                         ELSE
                                         BEGIN
                                             INSERT INTO machineFileInfo (provenfileName, fileType, filePath, fileSize, fileDateCreated, ProvenModifiedDate, fileOwner, computer, isMoved, operationno, operationDespcription, componentid, UpdatedTS)
-                                            VALUES (@provenfileName, @fileType, @filePath, @fileSize, @fileDateCreated, @ProvenModifiedDate, @fileOwner, @computer, @isMoved, @operationno, @operationDespcription, @componentid, GETDATE());
+                                            VALUES (@provenfileName, @fileType, @filePath, @fileSize, @fileDateCreated, @ProvenModifiedDate, @fileOwner, @computer, @isMoved, @operationno, @operationDespcription, @componentid, @UpdatedTS);
                                         END;
                                         ";
 
@@ -108,6 +138,7 @@ namespace machineFilesInfo
                 _ = cmd.Parameters.AddWithValue("@operationno", operationno);
                 _ = cmd.Parameters.AddWithValue("@operationDespcription", operationDespcription);
                 _ = cmd.Parameters.AddWithValue("@componentid", componentid);
+                _ = cmd.Parameters.AddWithValue("@UpdatedTS", UpdatedTS);
                 _ = cmd.ExecuteNonQuery();
             }
         }
@@ -116,9 +147,19 @@ namespace machineFilesInfo
         {
             try
             {
-                string updateStatusQry = @"UPDATE machineFileInfo SET isMoved=CAST(T1.ABC AS bit)FROM(SELECT componentid,operationno,(CASE WHEN provenModifiedDate>=StandardModifiedDate THEN 1 ELSE 0 END) AS ABCFROM machineFileInfo A1) T1INNER JOIN machineFileInfo T2 ON T1.componentID=T2.componentID AND T1.OperationNo=t2.operationno";
+                string updateStatusQry = @"UPDATE MFI
+                                        SET MFI.isMoved = CAST(T1.ABC AS bit),
+                                            MFI.UpdatedTS = @updatedTS
+                                        FROM (
+                                            SELECT A1.componentid, A1.operationno,
+                                                    (CASE WHEN A1.provenModifiedDate >= A1.StandardModifiedDate THEN 1 ELSE 0 END) AS ABC
+                                            FROM machineFileInfo A1
+                                        ) T1
+                                        INNER JOIN machineFileInfo MFI ON T1.componentID = MFI.componentID AND T1.OperationNo = MFI.operationno;
+                                        ";
                 using (SqlCommand cmd = new SqlCommand(updateStatusQry, conn))
                 {
+                    _ = cmd.Parameters.AddWithValue("@updatedTS", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                     _ = cmd.ExecuteNonQuery();
                 }
             }
@@ -129,7 +170,7 @@ namespace machineFilesInfo
             }
         }
 
-        public static void UpdateStatusStandardToNUll(FileInformation PFile, SqlConnection conn)
+        public static void UpdateStatusStandardToNULL(FileInformation PFile, SqlConnection conn)
         {
 
             try
@@ -137,18 +178,19 @@ namespace machineFilesInfo
                 string operation = PFile.FolderPath.Split('\\').Reverse().Skip(1).First();
                 string componentid = PFile.FolderPath.Split('\\').Reverse().Skip(3).First();
                 int operationno = int.Parse(operation.Split('_').First());
-                string updateStatusQry = @"Update machineFileInfo SET standardfileName = NULL, StandardModifiedDate = NULL WHERE operationno = @operationno AND componentid = @componentid";
+                string updateStatusQry = @"Update machineFileInfo SET standardfileName = NULL, StandardModifiedDate = NULL , UpdatedTS = @updatedTS WHERE operationno = @operationno AND componentid = @componentid";
                 using (SqlCommand cmd = new SqlCommand(updateStatusQry, conn))
                 {
                     _ = cmd.Parameters.AddWithValue("@provenfileName", PFile.FileName);
                     _ = cmd.Parameters.AddWithValue("@operationno", operationno);
                     _ = cmd.Parameters.AddWithValue("@componentid", componentid);
+                    _ = cmd.Parameters.AddWithValue("@updatedTS", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                     _ = cmd.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
             {
-                Logger.WriteErrorLog("Error in UpdateStatusStandardToNUll: " + ex.Message);
+                Logger.WriteErrorLog("Error in UpdateStatusStandardToNULL: " + ex.Message);
             }
         }
     }
