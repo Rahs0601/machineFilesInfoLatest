@@ -15,7 +15,6 @@ namespace machineFilesInfo
         private readonly List<FileInformation> ProvenMachineProgramList = new List<FileInformation>();
         private readonly List<FileInformation> StandardSoftwareProgramList = new List<FileInformation>();
         private List<TimeSpan> shiftDetails = new List<TimeSpan>();
-        private readonly List<FileInformation> dblist = new List<FileInformation>();
         private readonly string synctype = ConfigurationManager.AppSettings["syncType"];
         private readonly Thread StartFunctionThread = null;
         private DateTime Target = DateTime.Now.AddHours(-1);
