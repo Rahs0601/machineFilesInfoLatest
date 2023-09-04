@@ -62,9 +62,10 @@ namespace machineFilesInfo
                     {
                         if (DateTime.Now >= Target)
                         {
-                            Logger.WriteDebugLog("Process Started at" + DateTime.Now);
+                            Logger.WriteExtraLog("Process Started ");
                             setAndGetFileInfo();
-                            Logger.WriteDebugLog("Process Ended at" + DateTime.Now);
+                            Logger.WriteExtraLog("Process Ended");
+                            Logger.WriteExtraLog("Process will start again at " + Target);
                         }
                     }
                     catch (Exception ex)
@@ -174,6 +175,7 @@ namespace machineFilesInfo
                 }
                 //make target time as shift end time of today 
                 Target = DateTime.Today.Add(shiftDetails[idx]);
+
             }
             catch (Exception ex)
             {

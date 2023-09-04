@@ -13,7 +13,7 @@ namespace machineFilesInfo
             {
 
                 List<TimeSpan> shiftDetails = new List<TimeSpan>();
-                string query = "select * from shiftdetails where running = 1";
+                string query = "Select distinct cast(Concat(Convert(nvarchar(10),GETDATE(),120),' ',cast(cast(ToTime as time) as nvarchar(10))) as datetime) ShiftEnd\r\nfrom ShiftInformation where Running=1";
                 SqlConnection conn = ConnectionManager.GetConnection();
                 SqlCommand cmd = new SqlCommand(query, conn);
                 SqlDataReader reader = cmd.ExecuteReader();
@@ -21,7 +21,7 @@ namespace machineFilesInfo
                 while (reader.Read())
                 {
                     //get time only from db
-                    TimeSpan Shiftend = DateTime.Parse(reader["ToTime"].ToString()).TimeOfDay;
+                    TimeSpan Shiftend = DateTime.Parse(reader["ShiftEnd"].ToString()).TimeOfDay;
                     shiftDetails.Add(Shiftend);
                 }
                 return shiftDetails;
@@ -82,7 +82,7 @@ namespace machineFilesInfo
                     _ = cmd.Parameters.AddWithValue("@componentid", componentid);
                     _ = cmd.Parameters.AddWithValue("@UpdatedTS", UpdatedTS);
                     _ = cmd.ExecuteNonQuery();
-                    Logger.WriteExtraLog($"File {SFile.FileName} information inserted or updated in the database." + DateTime.Now);
+                    Logger.WriteExtraLog($"File {SFile.FileName} information inserted or updated in the database.");
                 }
             }
             catch (Exception ex)
@@ -94,21 +94,23 @@ namespace machineFilesInfo
 
         public static void InsertOrUpdateProvenIntoDatabase(FileInformation PFile, SqlConnection conn)
         {
-            string UpdatedTS = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            string provenfileName = PFile.FileName;
-            string fileType = PFile.FileType;
-            string filePath = PFile.FolderPath;
-            string fileSize = PFile.FileSize.ToString();
-            string fileDateCreated = PFile.CreatedDate.ToString("yyyy-MM-dd HH:mm:ss");
-            string ProvenModifiedDate = PFile.ModifiedDate.ToString("yyyy-MM-dd HH:mm:ss");
-            string fileOwner = PFile.Owner;
-            string computer = PFile.ComputerName;
-            int isMoved = 1;
-            string operation = PFile.FolderPath.Split('\\').Reverse().Skip(1).First();
-            string componentid = PFile.FolderPath.Split('\\').Reverse().Skip(3).First();
-            int operationno = int.Parse(operation.Split('_').First());
-            string operationDespcription = operation.Split('_').Last();
-            string insertOrUpdateQry = @"IF EXISTS (SELECT * FROM machineFileInfo WHERE operationno = @operationno AND componentid = @componentid)
+            try
+            {
+                string UpdatedTS = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                string provenfileName = PFile.FileName;
+                string fileType = PFile.FileType;
+                string filePath = PFile.FolderPath;
+                string fileSize = PFile.FileSize.ToString();
+                string fileDateCreated = PFile.CreatedDate.ToString("yyyy-MM-dd HH:mm:ss");
+                string ProvenModifiedDate = PFile.ModifiedDate.ToString("yyyy-MM-dd HH:mm:ss");
+                string fileOwner = PFile.Owner;
+                string computer = PFile.ComputerName;
+                int isMoved = 0;
+                string operation = PFile.FolderPath.Split('\\').Reverse().Skip(1).First();
+                string componentid = PFile.FolderPath.Split('\\').Reverse().Skip(3).First();
+                int operationno = int.Parse(operation.Split('_').First());
+                string operationDespcription = operation.Split('_').Last();
+                string insertOrUpdateQry = @"IF EXISTS (SELECT * FROM machineFileInfo WHERE operationno = @operationno AND componentid = @componentid)
                                         BEGIN
                                             UPDATE machineFileInfo 
                                             SET provenfileName = @provenfileName,
@@ -124,22 +126,28 @@ namespace machineFilesInfo
                                         END;
                                         ";
 
-            using (SqlCommand cmd = new SqlCommand(insertOrUpdateQry, conn))
+                using (SqlCommand cmd = new SqlCommand(insertOrUpdateQry, conn))
+                {
+                    _ = cmd.Parameters.AddWithValue("@provenfileName", provenfileName);
+                    _ = cmd.Parameters.AddWithValue("@fileType", fileType);
+                    _ = cmd.Parameters.AddWithValue("@filePath", filePath);
+                    _ = cmd.Parameters.AddWithValue("@fileSize", fileSize);
+                    _ = cmd.Parameters.AddWithValue("@fileDateCreated", fileDateCreated);
+                    _ = cmd.Parameters.AddWithValue("@ProvenModifiedDate", ProvenModifiedDate);
+                    _ = cmd.Parameters.AddWithValue("@fileOwner", fileOwner);
+                    _ = cmd.Parameters.AddWithValue("@computer", computer);
+                    _ = cmd.Parameters.AddWithValue("@isMoved", isMoved);
+                    _ = cmd.Parameters.AddWithValue("@operationno", operationno);
+                    _ = cmd.Parameters.AddWithValue("@operationDespcription", operationDespcription);
+                    _ = cmd.Parameters.AddWithValue("@componentid", componentid);
+                    _ = cmd.Parameters.AddWithValue("@UpdatedTS", UpdatedTS);
+                    _ = cmd.ExecuteNonQuery();
+                    Logger.WriteExtraLog($"File {PFile.FileName} information inserted or updated in the database.");
+                }
+            }
+            catch (Exception ex)
             {
-                _ = cmd.Parameters.AddWithValue("@provenfileName", provenfileName);
-                _ = cmd.Parameters.AddWithValue("@fileType", fileType);
-                _ = cmd.Parameters.AddWithValue("@filePath", filePath);
-                _ = cmd.Parameters.AddWithValue("@fileSize", fileSize);
-                _ = cmd.Parameters.AddWithValue("@fileDateCreated", fileDateCreated);
-                _ = cmd.Parameters.AddWithValue("@ProvenModifiedDate", ProvenModifiedDate);
-                _ = cmd.Parameters.AddWithValue("@fileOwner", fileOwner);
-                _ = cmd.Parameters.AddWithValue("@computer", computer);
-                _ = cmd.Parameters.AddWithValue("@isMoved", isMoved);
-                _ = cmd.Parameters.AddWithValue("@operationno", operationno);
-                _ = cmd.Parameters.AddWithValue("@operationDespcription", operationDespcription);
-                _ = cmd.Parameters.AddWithValue("@componentid", componentid);
-                _ = cmd.Parameters.AddWithValue("@UpdatedTS", UpdatedTS);
-                _ = cmd.ExecuteNonQuery();
+                Logger.WriteErrorLog("Error in InsertOrUpdateProvenIntoDatabase: " + ex.Message);
             }
         }
 
@@ -161,6 +169,7 @@ namespace machineFilesInfo
                 {
                     _ = cmd.Parameters.AddWithValue("@updatedTS", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                     _ = cmd.ExecuteNonQuery();
+                    Logger.WriteExtraLog($"Status updated in the database for all Files.");
                 }
             }
             catch (Exception ex)
@@ -186,6 +195,7 @@ namespace machineFilesInfo
                     _ = cmd.Parameters.AddWithValue("@componentid", componentid);
                     _ = cmd.Parameters.AddWithValue("@updatedTS", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                     _ = cmd.ExecuteNonQuery();
+                    Logger.WriteExtraLog($"File {PFile.FileName} information updated in the database To Null for Standard.");
                 }
             }
             catch (Exception ex)
