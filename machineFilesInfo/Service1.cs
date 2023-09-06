@@ -62,10 +62,10 @@ namespace machineFilesInfo
                     {
                         if (DateTime.Now >= Target)
                         {
-                            Logger.WriteExtraLog("Process Started ");
+                            Logger.WriteDebugLog("Process Started ");
                             setAndGetFileInfo();
-                            Logger.WriteExtraLog("Process Ended");
-                            Logger.WriteExtraLog("Process will start again at " + Target);
+                            Logger.WriteDebugLog("Process Ended");
+                            Logger.WriteDebugLog("Process will start again at " + Target);
                         }
                     }
                     catch (Exception ex)
@@ -171,10 +171,13 @@ namespace machineFilesInfo
                 int idx = shiftDetails.FindIndex(x => x > DateTime.Now.TimeOfDay);
                 if (idx == -1)
                 {
-                    idx = 0;
+                    Target = DateTime.Today.AddDays(1).Add(shiftDetails[0]);
                 }
-                //make target time as shift end time of today 
-                Target = DateTime.Today.Add(shiftDetails[idx]);
+                else
+                {
+                    //make target time as shift end time of today 
+                    Target = DateTime.Today.Add(shiftDetails[idx]);
+                }
 
             }
             catch (Exception ex)
